@@ -8,7 +8,9 @@ const QUESTIONS_PER_QUIZ = 65;
 
 const elements = Object.fromEntries([
   'bank-count', 'quiz-filter', 'question-jump-form', 'question-jump', 'jump-range',
-  'progress-label', 'progress-fill', 'answered-count', 'correct-count',
+  'progress-label', 'progress-fill', 'answered-count', 'correct-count', 'accuracy-total',
+  'accuracy-track', 'accuracy-correct', 'accuracy-wrong', 'accuracy-right-label', 'accuracy-wrong-label',
+  'map-summary', 'wrong-filter', 'wrong-filter-count', 'question-grid', 'map-empty',
   'folder-button', 'files-button', 'folder-input', 'files-input', 'empty-import-button', 'shuffle-button',
   'question-position', 'question-type', 'empty-state', 'quiz-content', 'question-number', 'source-name',
   'question-text', 'answer-instruction-text', 'options-list', 'feedback', 'selection-count', 'check-button',
@@ -20,6 +22,7 @@ let progress = loadProgress();
 let questionOrder = [];
 let currentQuestionId = null;
 let currentQuizIndex = 0;
+let wrongOnly = false;
 let toastTimer;
 
 function loadProgress() {
@@ -365,12 +368,56 @@ function renderProgress() {
   updateQuizCompletion();
   const answered = list.filter((question) => progress[question.id]?.checked).length;
   const correct = list.filter((question) => progress[question.id]?.correct).length;
+  const wrong = answered - correct;
   const percent = list.length ? Math.round((answered / list.length) * 100) : 0;
+  const rightAccuracy = answered ? Math.round((correct / answered) * 100) : 0;
+  const wrongAccuracy = answered ? 100 - rightAccuracy : 0;
   elements['bank-count'].textContent = list.length.toLocaleString();
   elements['progress-label'].textContent = `${percent}%`;
   elements['progress-fill'].style.width = `${percent}%`;
   elements['answered-count'].textContent = `${answered} answered`;
   elements['correct-count'].textContent = `${correct} correct`;
+  elements['accuracy-total'].textContent = `${answered} / ${list.length} graded`;
+  elements['accuracy-correct'].style.width = `${list.length ? (correct / list.length) * 100 : 0}%`;
+  elements['accuracy-wrong'].style.width = `${list.length ? (wrong / list.length) * 100 : 0}%`;
+  elements['accuracy-right-label'].textContent = `Right ${rightAccuracy}%`;
+  elements['accuracy-wrong-label'].textContent = `Wrong ${wrongAccuracy}%`;
+  elements['accuracy-track'].setAttribute('aria-label', answered
+    ? `Of ${answered} graded answers, ${rightAccuracy}% right and ${wrongAccuracy}% wrong`
+    : 'No graded answers yet');
+}
+
+function renderQuestionMap() {
+  const currentIndex = questionOrder.findIndex((question) => question.id === currentQuestionId);
+  const answered = questionOrder.filter((question) => progress[question.id]?.checked).length;
+  const wrong = questionOrder.filter((question) => progress[question.id]?.checked && !progress[question.id]?.correct);
+  const visible = questionOrder
+    .map((question, index) => ({ question, index, state: progress[question.id] }))
+    .filter(({ state }) => !wrongOnly || (state?.checked && !state.correct));
+
+  elements['map-summary'].textContent = `${answered} of ${questionOrder.length} answered · ${questionOrder.length - answered} left`;
+  elements['wrong-filter-count'].textContent = String(wrong.length);
+  elements['wrong-filter'].setAttribute('aria-pressed', String(wrongOnly));
+  elements['question-grid'].replaceChildren(...visible.map(({ question, index, state }) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'question-tile';
+    if (state?.checked) button.classList.add(state.correct ? 'right' : 'wrong');
+    if (index === currentIndex) button.classList.add('current');
+    button.textContent = String(index + 1);
+    button.setAttribute('aria-label', `Question ${index + 1}${state?.checked ? (state.correct ? ', correct' : ', incorrect') : ', unanswered'}`);
+    if (index === currentIndex) button.setAttribute('aria-current', 'step');
+    button.title = `Question ${index + 1}${state?.checked ? (state.correct ? ' · Right' : ' · Wrong') : ' · Unanswered'}`;
+    button.addEventListener('click', () => {
+      currentQuestionId = question.id;
+      savePosition();
+      render();
+      elements['question-panel'].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return button;
+  }));
+  elements['map-empty'].hidden = !wrongOnly || wrong.length > 0;
+  elements['question-grid'].hidden = wrongOnly && wrong.length === 0;
 }
 
 function render() {
@@ -391,6 +438,7 @@ function render() {
   elements['shuffle-button'].title = questionOrder.shuffled ? 'Restore question order' : 'Shuffle questions';
   elements['shuffle-button'].setAttribute('aria-label', elements['shuffle-button'].title);
   renderProgress();
+  renderQuestionMap();
   if (!question) return;
 
   const state = progress[question.id] || { selected: [], checked: false };
@@ -605,8 +653,13 @@ elements['folder-input'].addEventListener('change', (event) => {
   event.target.value = '';
 });
 elements['quiz-filter'].addEventListener('change', () => {
+  wrongOnly = false;
   setQuiz(Number(elements['quiz-filter'].value));
   render();
+});
+elements['wrong-filter'].addEventListener('click', () => {
+  wrongOnly = !wrongOnly;
+  renderQuestionMap();
 });
 elements['question-jump-form'].addEventListener('submit', (event) => {
   event.preventDefault();

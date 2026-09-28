@@ -41,6 +41,12 @@
           <div class="progress-label"><span>Session progress</span><span id="progress-label">0%</span></div>
           <div class="progress-track"><span id="progress-fill"></span></div>
           <div class="progress-detail"><span id="answered-count">0 answered</span><span id="correct-count">0 correct</span></div>
+          <div class="accuracy-heading"><span>Right / wrong</span><span id="accuracy-total">0 graded</span></div>
+          <div class="accuracy-track" id="accuracy-track" role="img" aria-label="No graded answers yet">
+            <span class="accuracy-correct" id="accuracy-correct"></span>
+            <span class="accuracy-wrong" id="accuracy-wrong"></span>
+          </div>
+          <div class="accuracy-detail"><span id="accuracy-right-label">Right 0%</span><span id="accuracy-wrong-label">Wrong 0%</span></div>
           <div class="local-note"><span class="local-indicator"></span> Your study data stays in this browser</div>
         </div>
       </aside>
@@ -115,6 +121,23 @@
                 <button class="check-button" id="check-button" type="button">Check answer <span aria-hidden="true">↗</span></button>
               </div>
             </div>
+          </section>
+
+          <section class="question-map" aria-label="Question review map">
+            <div class="map-header">
+              <div>
+                <p class="eyebrow">QUESTION MAP</p>
+                <p class="map-summary" id="map-summary">No questions answered yet</p>
+              </div>
+              <button class="wrong-filter" id="wrong-filter" type="button" aria-pressed="false">Wrong only <span id="wrong-filter-count">0</span></button>
+            </div>
+            <div class="map-legend" aria-label="Question status legend">
+              <span><i class="legend-swatch unanswered"></i>Unanswered</span>
+              <span><i class="legend-swatch right"></i>Right</span>
+              <span><i class="legend-swatch wrong"></i>Wrong</span>
+            </div>
+            <div class="question-grid" id="question-grid" role="group" aria-label="Questions in this quiz"></div>
+            <p class="map-empty" id="map-empty" hidden>No wrong answers in this quiz.</p>
           </section>
 
           <footer class="bottom-nav">
