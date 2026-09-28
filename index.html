@@ -116,6 +116,27 @@
               <div class="answer-instruction"><span class="instruction-rule"></span><span id="answer-instruction-text">Choose one answer</span></div>
               <div id="options-list" class="options-list"></div>
               <div id="feedback" class="feedback" hidden></div>
+              <section id="explanation" class="explanation" aria-label="Generated study explanation" hidden>
+                <div class="explanation-heading">
+                  <p class="eyebrow">GENERATED STUDY NOTES</p>
+                  <p class="explanation-disclaimer">Reasoning based on the question and marked answer; not an official source rationale.</p>
+                </div>
+                <div class="explanation-requirement">
+                  <span class="explanation-label">REQUIREMENT</span>
+                  <p id="requirement-text"></p>
+                </div>
+                <div class="option-reason-list" id="option-reasons"></div>
+                <div class="study-notes-grid">
+                  <div class="study-note trap-note">
+                    <span class="explanation-label">TRAP TO AVOID</span>
+                    <p id="trap-text"></p>
+                  </div>
+                  <div class="study-note takeaway-note">
+                    <span class="explanation-label">KEY TAKEAWAY</span>
+                    <p id="takeaway-text"></p>
+                  </div>
+                </div>
+              </section>
               <div class="question-footer">
                 <span id="selection-count" class="selection-count">Select an answer to continue</span>
                 <button class="check-button" id="check-button" type="button">Check answer <span aria-hidden="true">↗</span></button>

@@ -6,6 +6,8 @@ Use the header theme control to switch between Light, Dark, and OLED pure-black 
 
 The bank is split into quizzes of 65 questions, with a question-number jump control. The app saves the active quiz, question, and shuffled order so reloading resumes in the same place.
 
+After grading, the quiz generates per-option reasoning, a trap to avoid, and a key takeaway from the question wording and marked answers. These are study notes, not official explanations from the DOCX source; verify nuanced service details against current AWS documentation.
+
 ## Run locally
 
 From PowerShell in this folder:

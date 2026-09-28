@@ -13,7 +13,8 @@ const elements = Object.fromEntries([
   'map-summary', 'wrong-filter', 'wrong-filter-count', 'question-grid', 'map-empty',
   'folder-button', 'files-button', 'folder-input', 'files-input', 'empty-import-button', 'shuffle-button',
   'question-position', 'question-type', 'empty-state', 'quiz-content', 'question-number', 'source-name',
-  'question-text', 'answer-instruction-text', 'options-list', 'feedback', 'selection-count', 'check-button',
+  'question-text', 'answer-instruction-text', 'options-list', 'feedback', 'explanation', 'requirement-text',
+  'option-reasons', 'trap-text', 'takeaway-text', 'selection-count', 'check-button',
   'previous-button', 'next-button', 'nav-caption', 'toast'
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -420,6 +421,113 @@ function renderQuestionMap() {
   elements['question-grid'].hidden = wrongOnly && wrong.length === 0;
 }
 
+function extractRequirement(prompt) {
+  const text = prompt.replace(/\s+/g, ' ').trim();
+  const sentences = text.match(/[^.!?]+[.!?]?/g) || [text];
+  const explicitQuestion = sentences.findIndex((sentence) => /^\s*(which|what|how|why|a solutions architect|what should|which solution)\b/i.test(sentence));
+  const context = sentences.slice(0, explicitQuestion >= 0 ? explicitQuestion : sentences.length);
+  const requirementSentences = context.filter((sentence) => /\b(must|need|needs|require|requires|want|wants|least|most|only|without|ensure|should|acceptable|within|quickly|latency|order|cost|secure|available|recover|recovery|overhead|operational)\b/i.test(sentence));
+  const selected = (requirementSentences.length ? requirementSentences.slice(-2) : context.slice(-1)).join(' ').trim();
+  return selected.length > 360 ? `${selected.slice(0, 357).trimEnd()}...` : selected;
+}
+
+function optionInsight(optionText) {
+  const text = optionText.toLowerCase();
+  if (/transfer acceleration/.test(text)) return 'S3 Transfer Acceleration routes uploads through AWS edge locations to improve long-distance transfers into one S3 bucket; multipart upload improves throughput for large objects.';
+  if (/cross.region replication|\bcrr\b/.test(text)) return 'S3 Cross-Region Replication asynchronously copies objects between buckets in different Regions; it adds a replication path and does not make the original upload land directly in the destination bucket.';
+  if (/snowball/.test(text)) return 'AWS Snowball is designed for bulk data transfer when network transfer is impractical; arranging device jobs is not a low-overhead, near-real-time upload path.';
+  if (/sqs.{0,45}fifo|fifo.{0,45}sqs/.test(text)) return 'An SQS FIFO queue preserves ordering within each message group; the group ID defines which messages must stay in sequence.';
+  if (/sqs/.test(text)) return 'An SQS standard queue scales well, but it provides best-effort ordering rather than the strict FIFO ordering required by some workloads.';
+  if (/kinesis data streams|kinesis data stream/.test(text)) return 'Kinesis Data Streams preserves order within a shard; using the entity ID as the partition key keeps related events on the same shard.';
+  if (/\bsns\b|simple notification service/.test(text)) return 'SNS is a pub/sub fan-out service; by itself it does not provide the per-message FIFO processing guarantee required by an ordered workflow.';
+  if (/dax|dynamodb accelerator/.test(text)) return 'DynamoDB Accelerator (DAX) is a managed in-memory cache for DynamoDB reads and can improve read latency without changing the application’s DynamoDB API calls.';
+  if (/elasticache/.test(text)) return 'ElastiCache is a separate in-memory cache; the application generally must be designed or changed to read from and maintain that cache.';
+  if (/interface endpoint|private link/.test(text)) return 'An interface VPC endpoint uses AWS PrivateLink to reach supported services privately over the AWS network.';
+  if (/gateway endpoint/.test(text)) return 'A gateway VPC endpoint provides private routing specifically for Amazon S3 or DynamoDB; it is not a general endpoint for other AWS services.';
+  if (/cloudfront/.test(text)) return 'CloudFront caches content at edge locations, reducing repeated origin requests and latency for globally distributed viewers.';
+  if (/storage lens/.test(text)) return 'Amazon S3 Storage Lens provides organization-wide visibility and metrics across S3 buckets, including storage configuration and usage.';
+  if (/object lambda/.test(text)) return 'S3 Object Lambda can invoke Lambda to transform an object as it is retrieved, so a caller can receive a filtered view without changing the stored original.';
+  if (/\bkms\b|key management service/.test(text)) return 'AWS KMS manages encryption keys and integrates with AWS services; permissions and key policies determine which principals can use a key.';
+  if (/secrets manager/.test(text)) return 'AWS Secrets Manager stores and can rotate secrets; it is intended for secret lifecycle management rather than general-purpose application data processing.';
+  if (/aurora global|global database/.test(text)) return 'An Aurora Global Database replicates an Aurora cluster across Regions with low-latency storage replication for disaster recovery and read access.';
+  if (/multi.az|multi az/.test(text)) return 'A Multi-AZ database deployment maintains a standby in another Availability Zone for high availability; it is not a cross-Region disaster-recovery design.';
+  if (/\bcloudtrail\b/.test(text)) return 'AWS CloudTrail records account activity and API calls for auditing; it is not a live application performance or resource-metrics service.';
+  if (/\bcloudwatch\b/.test(text)) return 'Amazon CloudWatch collects metrics, logs, and alarms for monitoring workloads and responding to operational signals.';
+  if (/auto scaling|autoscaling/.test(text)) return 'EC2 Auto Scaling adjusts instance capacity to match configured health and scaling policies; it does not itself cache or accelerate static content.';
+  if (/\blambda\b/.test(text)) return 'AWS Lambda runs code in response to events without managing servers, but the function’s event path and processing logic still need to meet the stated latency and ordering requirements.';
+  if (/\b(route 53|dns|failover routing)\b/.test(text)) return 'Amazon Route 53 provides DNS and health-check-based routing; DNS failover redirects traffic but does not replicate application data or make an unhealthy service healthy.';
+  if (/patchloadbalan.{0,5}instance|awsec2.patchloadbalan.{0,5}instance|patch manager|systems manager.{0,30}patch|ssm.{0,30}patch/.test(text)) return 'The AWSEC2-PatchLoadBalancerInstance Systems Manager Automation document coordinates patching for a load-balanced EC2 instance: it removes the instance from service, patches it, and returns it to the load balancer.';
+  if (/target type.{0,80}instance type|target group.{0,80}instance type|instance type.{0,80}target group/.test(text)) return 'An Application Load Balancer target group with instance targets registers EC2 instances by instance ID; that target type is required for the load-balancer-aware Systems Manager patch workflow used here.';
+  if (/maintenance window/.test(text)) return 'Systems Manager Maintenance Windows schedules operational tasks, but scheduling a patch task alone does not provide the load-balancer-aware deregister, patch, and re-register workflow required here.';
+  if (/state manager/.test(text)) return 'Systems Manager State Manager maintains a desired instance configuration; it does not by itself drain an instance from an ALB target group and safely return it after patching.';
+  if (/\b(eventbridge|event bus|eventbridge scheduler)\b/.test(text)) return 'Amazon EventBridge routes events between producers and consumers; event buses support fan-out, while ordering guarantees depend on the specific event target and queue or stream.';
+  if (/\b(aws backup|backup plan|recovery point)\b/.test(text)) return 'AWS Backup centrally schedules and manages backups; restoring from a recovery point is not the same as continuous replication or low-recovery-point failover.';
+  if (/\b(direct connect|site.to.site vpn)\b/.test(text)) return 'AWS Direct Connect provides a dedicated network connection to AWS, while Site-to-Site VPN uses encrypted tunnels over the internet; neither choice alone copies application data.';
+  if (/\b(efs|elastic file system)\b/.test(text)) return 'Amazon EFS is a managed, elastic NFS file system for Linux workloads and can be mounted concurrently by multiple instances.';
+  if (/\b(fsx|lustre|windows file server)\b/.test(text)) return 'Amazon FSx provides managed file systems with workload-specific protocols and features, such as Windows file shares or high-performance Lustre.';
+  if (/\b(aws config|configuration recorder|config rule)\b/.test(text)) return 'AWS Config records resource configuration and evaluates compliance rules over time; it is not a real-time traffic-control mechanism.';
+  if (/\b(service control policy|\bscp\b|aws organizations)\b/.test(text)) return 'AWS Organizations service control policies set maximum available permissions for accounts; they do not grant permissions by themselves.';
+  if (/\b(waf|web application firewall)\b/.test(text)) return 'AWS WAF filters HTTP requests using web ACL rules; it protects application endpoints but does not replace network routing or identity permissions.';
+  if (/\b(spot instance|spot instances)\b/.test(text)) return 'EC2 Spot Instances can reduce compute costs but may be interrupted when AWS needs the capacity, so workloads must tolerate interruption.';
+  if (/\biam\b|identity and access/.test(text)) return 'IAM policies control who can call AWS APIs and which resources they can access; they do not provide the application feature or data transformation by themselves.';
+  if (/ebs snapshot|elastic block store/.test(text)) return 'EBS snapshots back up block volumes; copying and restoring them is a volume recovery workflow, not a direct S3 object-ingestion path.';
+  if (/lifecycle|glacier|deep archive/.test(text)) return 'S3 Lifecycle automates object transitions and expiration; archival storage classes trade retrieval speed for lower storage cost.';
+  if (/\brds\b|relational database service/.test(text)) return 'Amazon RDS manages relational databases, while the correct availability, replication, and recovery behavior depends on the selected deployment configuration.';
+  if (/\bs3\b|simple storage service/.test(text)) return 'Amazon S3 is object storage; bucket policies, replication, lifecycle, and acceleration each solve different storage or transfer requirements.';
+  return '';
+}
+
+function makeOptionRationale(option, correctOption, requirement) {
+  const insight = optionInsight(option.text);
+  const correctInsight = optionInsight(correctOption.text);
+  if (option.correct) {
+    return insight
+      ? `${insight} This matches the stated requirement: ${requirement}`
+      : `This option proposes: ${option.text} It is the choice marked correct in the source question and is the best match for: ${requirement}`;
+  }
+  const optionDescription = insight || `This option proposes: ${option.text}`;
+  const comparison = correctInsight
+    ? `The marked answer instead uses a more direct fit: ${correctInsight}`
+    : `The source marks ${correctOption.letter} instead. Compare this proposal with the requirement and the marked choice: ${correctOption.text}`;
+  return `${optionDescription} This is less suitable for this scenario because the deciding requirement is: ${requirement} ${comparison}`;
+}
+
+function renderExplanation(question, state, correctOptions) {
+  elements['explanation'].hidden = !state.checked;
+  elements['option-reasons'].replaceChildren();
+  if (!state.checked) return;
+
+  const requirement = extractRequirement(question.prompt) || 'Choose the option that meets all stated constraints.';
+  const primaryCorrect = correctOptions[0];
+  elements['requirement-text'].textContent = requirement;
+  elements['option-reasons'].replaceChildren(...question.options.map((option) => {
+    const row = document.createElement('div');
+    row.className = `option-reason ${option.correct ? 'is-correct' : 'is-incorrect'}`;
+    const letter = document.createElement('span');
+    letter.className = 'reason-letter';
+    letter.textContent = option.letter;
+    const content = document.createElement('div');
+    const heading = document.createElement('p');
+    heading.className = 'reason-heading';
+    heading.textContent = option.correct ? 'Why it is right' : 'Why it is wrong';
+    const rationale = document.createElement('p');
+    rationale.className = 'reason-copy';
+    rationale.textContent = makeOptionRationale(option, primaryCorrect, requirement);
+    content.append(heading, rationale);
+    row.append(letter, content);
+    return row;
+  }));
+
+  const selectedWrong = question.options.find((option) => state.selected.includes(option.letter) && !option.correct);
+  const trapOption = selectedWrong || question.options.find((option) => !option.correct);
+  const trapInsight = trapOption && optionInsight(trapOption.text);
+  const correctInsight = optionInsight(primaryCorrect.text);
+  elements['trap-text'].textContent = trapOption
+    ? `The tempting distractor is ${trapOption.letter}. ${trapInsight || `It sounds plausible, but it does not satisfy the marked answer for this scenario.`} Check it against the requirement: ${requirement}`
+    : `Do not choose by familiar service name alone. Check every choice against the constraint: ${requirement}`;
+  elements['takeaway-text'].textContent = `${correctInsight || `The source marks ${primaryCorrect.letter} as correct.`} When solving similar questions, identify the constraint first: ${requirement}`;
+}
+
 function render() {
   const list = questionOrder;
   const question = selectedQuestion();
@@ -464,6 +572,7 @@ function render() {
     detail.textContent = `Correct answer${correctOptions.length > 1 ? 's' : ''}: ${correctOptions.map((option) => `${option.letter}. ${option.text}`).join('  ·  ')}`;
     elements['feedback'].append(summary, detail);
   }
+  renderExplanation(question, state, correctOptions);
 
   elements['options-list'].replaceChildren(...question.options.map((option) => {
     const button = document.createElement('button');
