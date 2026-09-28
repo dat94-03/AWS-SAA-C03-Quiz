@@ -340,7 +340,6 @@ kbd { padding: 2px 4px; border: 1px solid #505050; border-radius: 3px; color: #e
   .sidebar-bottom { grid-column: 2; grid-row: 1; justify-self: end; width: min(210px, 100%); margin: 0; padding: 0; }
   .progress-detail, .local-note { display: none; }
   .progress-track { margin-top: 6px; }
-  .accuracy-heading, .accuracy-track, .accuracy-detail { display: none; }
   .topbar { height: 58px; padding: 0 20px; }
   .content-wrap { padding: 35px 22px 10px; }
   .quiz-meta { margin-top: 25px; }
