@@ -28,14 +28,13 @@
             <p class="eyebrow">QUESTION BANK</p>
             <span class="count-pill" id="bank-count">0</span>
           </div>
-          <label class="source-picker" for="source-filter">
+          <label class="source-picker" for="quiz-filter">
             <span class="source-icon" aria-hidden="true">▤</span>
-            <select id="source-filter" aria-label="Filter questions by document">
-              <option value="all">All documents</option>
+            <select id="quiz-filter" aria-label="Choose a 65-question quiz">
+              <option value="0">Quiz 01</option>
             </select>
             <span class="select-chevron" aria-hidden="true">⌄</span>
           </label>
-          <div class="source-list" id="source-list"></div>
         </div>
 
         <div class="sidebar-bottom">
@@ -86,6 +85,14 @@
             <span class="meta-spacer"></span>
             <span class="keyboard-hint"><kbd>1</kbd>–<kbd>5</kbd> select <span class="hint-separator">·</span> <kbd>↵</kbd> check</span>
           </div>
+
+          <form class="quiz-tools" id="question-jump-form">
+            <label for="question-jump">JUMP TO QUESTION</label>
+            <span class="jump-prefix">#</span>
+            <input id="question-jump" type="number" min="1" max="65" value="1" inputmode="numeric" aria-label="Question number in this quiz">
+            <span class="jump-range" id="jump-range">of 65</span>
+            <button class="jump-button" type="submit">Go</button>
+          </form>
 
           <section class="question-panel" aria-live="polite">
             <div id="empty-state" class="empty-state">

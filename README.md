@@ -4,6 +4,8 @@ A static, dark-mode quiz for the AWS Certified Solutions Architect Associate (SA
 
 Use the header theme control to switch between Light, Dark, and OLED pure-black themes. Your choice is saved in the current browser.
 
+The bank is split into quizzes of 65 questions, with a question-number jump control. The app saves the active quiz, question, and shuffled order so reloading resumes in the same place.
+
 ## Run locally
 
 From PowerShell in this folder:

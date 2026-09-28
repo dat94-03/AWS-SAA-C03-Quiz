@@ -3,9 +3,12 @@ const MARKS = /[✅✔✓☑]/u;
 const DB_NAME = 'fieldnotes-saa';
 const DB_VERSION = 1;
 const PROGRESS_KEY = 'fieldnotes-saa-progress';
+const POSITION_KEY = 'fieldnotes-saa-position';
+const QUESTIONS_PER_QUIZ = 65;
 
 const elements = Object.fromEntries([
-  'bank-count', 'source-filter', 'source-list', 'progress-label', 'progress-fill', 'answered-count', 'correct-count',
+  'bank-count', 'quiz-filter', 'question-jump-form', 'question-jump', 'jump-range',
+  'progress-label', 'progress-fill', 'answered-count', 'correct-count',
   'folder-button', 'files-button', 'folder-input', 'files-input', 'empty-import-button', 'shuffle-button',
   'question-position', 'question-type', 'empty-state', 'quiz-content', 'question-number', 'source-name',
   'question-text', 'answer-instruction-text', 'options-list', 'feedback', 'selection-count', 'check-button',
@@ -16,6 +19,7 @@ let bank = { questions: [], sources: [] };
 let progress = loadProgress();
 let questionOrder = [];
 let currentQuestionId = null;
+let currentQuizIndex = 0;
 let toastTimer;
 
 function loadProgress() {
@@ -31,6 +35,26 @@ function saveProgress() {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
   } catch {
     showToast('Progress could not be saved by this browser.');
+  }
+}
+
+function savePosition() {
+  try {
+    localStorage.setItem(POSITION_KEY, JSON.stringify({
+      quizIndex: currentQuizIndex,
+      questionId: currentQuestionId,
+      shuffledOrder: questionOrder.shuffled ? questionOrder.map((question) => question.id) : null
+    }));
+  } catch {
+    showToast('Your current place could not be saved.');
+  }
+}
+
+function loadPosition() {
+  try {
+    return JSON.parse(localStorage.getItem(POSITION_KEY) || '{}');
+  } catch {
+    return {};
   }
 }
 
@@ -281,38 +305,64 @@ function mergeBanks(...banks) {
   };
 }
 
-function visibleQuestions() {
-  const source = elements['source-filter'].value;
-  return questionOrder.filter((question) => source === 'all' || question.source === source);
+function quizCount() {
+  return Math.ceil(bank.questions.length / QUESTIONS_PER_QUIZ);
+}
+
+function quizQuestions(index = currentQuizIndex) {
+  const start = index * QUESTIONS_PER_QUIZ;
+  return bank.questions.slice(start, start + QUESTIONS_PER_QUIZ)
+    .map((question, offset) => ({ ...question, _order: start + offset }));
+}
+
+function setQuiz(index, questionId = null, shuffledOrder = null) {
+  const count = quizCount();
+  currentQuizIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(count - 1, 0)));
+  const canonical = quizQuestions();
+  const byId = new Map(canonical.map((question) => [question.id, question]));
+  const canRestoreShuffle = Array.isArray(shuffledOrder)
+    && shuffledOrder.length === canonical.length
+    && shuffledOrder.every((id) => byId.has(id));
+  questionOrder = canRestoreShuffle ? shuffledOrder.map((id) => byId.get(id)) : canonical;
+  questionOrder.shuffled = canRestoreShuffle;
+  currentQuestionId = questionOrder.some((question) => question.id === questionId)
+    ? questionId
+    : questionOrder[0]?.id || null;
+  elements['quiz-filter'].value = String(currentQuizIndex);
+  elements['question-jump'].max = String(Math.max(questionOrder.length, 1));
+  elements['jump-range'].textContent = `of ${questionOrder.length}`;
+  savePosition();
+}
+
+function renderQuizChoices() {
+  const options = Array.from({ length: quizCount() }, (_, index) => {
+    const first = index * QUESTIONS_PER_QUIZ + 1;
+    const last = Math.min(first + QUESTIONS_PER_QUIZ - 1, bank.questions.length);
+    return new Option(`Quiz ${String(index + 1).padStart(2, '0')} · ${first}–${last}`, String(index));
+  });
+  elements['quiz-filter'].replaceChildren(...options);
+  elements['quiz-filter'].value = String(currentQuizIndex);
+}
+
+function updateQuizCompletion() {
+  for (const option of elements['quiz-filter'].options) {
+    const index = Number(option.value);
+    const questions = quizQuestions(index);
+    const complete = questions.length > 0 && questions.every((question) => progress[question.id]?.checked);
+    const first = index * QUESTIONS_PER_QUIZ + 1;
+    const last = Math.min(first + QUESTIONS_PER_QUIZ - 1, bank.questions.length);
+    option.textContent = `Quiz ${String(index + 1).padStart(2, '0')} · ${first}–${last}${complete ? ' · ✓ DONE' : ''}`;
+    option.dataset.complete = String(complete);
+  }
 }
 
 function selectedQuestion() {
-  const list = visibleQuestions();
-  return list.find((question) => question.id === currentQuestionId) || list[0] || null;
-}
-
-function renderSources() {
-  const currentSource = elements['source-filter'].value;
-  elements['source-filter'].replaceChildren(new Option('All documents', 'all'));
-  for (const source of bank.sources) elements['source-filter'].add(new Option(source.name, source.name));
-  elements['source-filter'].value = bank.sources.some((source) => source.name === currentSource) ? currentSource : 'all';
-  elements['source-list'].replaceChildren(...bank.sources.map((source) => {
-    const row = document.createElement('div');
-    row.className = 'source-item';
-    const name = document.createElement('span');
-    name.className = 'source-item-name';
-    name.title = source.name;
-    name.textContent = source.name.replace(/\.docx$/i, '');
-    const count = document.createElement('span');
-    count.className = 'source-item-count';
-    count.textContent = source.count;
-    row.append(name, count);
-    return row;
-  }));
+  return questionOrder.find((question) => question.id === currentQuestionId) || questionOrder[0] || null;
 }
 
 function renderProgress() {
-  const list = visibleQuestions();
+  const list = questionOrder;
+  updateQuizCompletion();
   const answered = list.filter((question) => progress[question.id]?.checked).length;
   const correct = list.filter((question) => progress[question.id]?.correct).length;
   const percent = list.length ? Math.round((answered / list.length) * 100) : 0;
@@ -324,14 +374,20 @@ function renderProgress() {
 }
 
 function render() {
-  const list = visibleQuestions();
+  const list = questionOrder;
   const question = selectedQuestion();
+  const questionIndex = question ? list.indexOf(question) : -1;
   elements['empty-state'].hidden = Boolean(question);
   elements['quiz-content'].hidden = !question;
-  elements['previous-button'].disabled = !question || list.indexOf(question) === 0;
-  elements['next-button'].disabled = !question || list.indexOf(question) === list.length - 1;
-  elements['question-position'].textContent = question ? `Question ${list.indexOf(question) + 1} of ${list.length}` : 'Waiting for questions';
-  elements['nav-caption'].textContent = question ? `${list.length.toLocaleString()} questions in this view` : 'Import documents to begin';
+  elements['previous-button'].disabled = !question || questionIndex === 0;
+  elements['next-button'].disabled = !question || questionIndex === list.length - 1;
+  elements['question-position'].textContent = question ? `Question ${questionIndex + 1} of ${list.length}` : 'Waiting for questions';
+  elements['question-type'].textContent = `QUIZ ${String(currentQuizIndex + 1).padStart(2, '0')} · PRACTICE`;
+  elements['question-jump'].value = question ? String(questionIndex + 1) : '';
+  elements['question-jump'].max = String(Math.max(list.length, 1));
+  elements['jump-range'].textContent = `of ${list.length}`;
+  elements['bank-count'].textContent = list.length.toLocaleString();
+  elements['nav-caption'].textContent = question ? `${list.length} questions in this quiz` : 'Import documents to begin';
   elements['shuffle-button'].title = questionOrder.shuffled ? 'Restore question order' : 'Shuffle questions';
   elements['shuffle-button'].setAttribute('aria-label', elements['shuffle-button'].title);
   renderProgress();
@@ -416,18 +472,19 @@ function checkAnswer() {
 }
 
 function moveQuestion(direction) {
-  const list = visibleQuestions();
+  const list = questionOrder;
   const index = list.findIndex((question) => question.id === selectedQuestion()?.id);
   const next = list[index + direction];
   if (!next) return;
   currentQuestionId = next.id;
+  savePosition();
   render();
 }
 
 function shuffleQuestions() {
   const selected = selectedQuestion();
   const shuffled = !questionOrder.shuffled;
-  questionOrder = [...questionOrder];
+  questionOrder = [...quizQuestions()];
   if (shuffled) {
     for (let index = questionOrder.length - 1; index > 0; index -= 1) {
       const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -438,6 +495,7 @@ function shuffleQuestions() {
   }
   questionOrder.shuffled = shuffled;
   currentQuestionId = selected?.id || questionOrder[0]?.id || null;
+  savePosition();
   render();
   showToast(shuffled ? 'Question order shuffled.' : 'Original question order restored.');
 }
@@ -518,9 +576,8 @@ async function importFiles(fileList) {
   for (const source of bank.sources) {
     source.count = bank.questions.filter((question) => question.source === source.name).length;
   }
-  questionOrder = bank.questions.map((question, index) => ({ ...question, _order: index }));
-  if (!currentQuestionId) currentQuestionId = questionOrder[0]?.id || null;
-  renderSources();
+  renderQuizChoices();
+  setQuiz(currentQuizIndex, currentQuestionId);
   render();
 
   try {
@@ -547,8 +604,19 @@ elements['folder-input'].addEventListener('change', (event) => {
   importFiles(event.target.files);
   event.target.value = '';
 });
-elements['source-filter'].addEventListener('change', () => {
-  currentQuestionId = visibleQuestions()[0]?.id || null;
+elements['quiz-filter'].addEventListener('change', () => {
+  setQuiz(Number(elements['quiz-filter'].value));
+  render();
+});
+elements['question-jump-form'].addEventListener('submit', (event) => {
+  event.preventDefault();
+  const requested = Number(elements['question-jump'].value);
+  if (!Number.isInteger(requested) || requested < 1 || requested > questionOrder.length) {
+    elements['question-jump'].value = String(Math.max(1, questionOrder.findIndex((question) => question.id === currentQuestionId) + 1));
+    return;
+  }
+  currentQuestionId = questionOrder[requested - 1].id;
+  savePosition();
   render();
 });
 elements['shuffle-button'].addEventListener('click', shuffleQuestions);
@@ -558,6 +626,7 @@ elements['check-button'].addEventListener('click', checkAnswer);
 document.addEventListener('keydown', (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.target.matches('input, select, textarea')) return;
   if (event.key === 'Enter') {
+    if (event.target === elements['question-jump']) return;
     event.preventDefault();
     checkAnswer();
     return;
@@ -585,9 +654,9 @@ document.addEventListener('keydown', (event) => {
     showToast('Browser storage is unavailable. Your bundled questions are still available.');
   }
   bank = mergeBanks(bundledBank, savedBank);
-  questionOrder = bank.questions.map((question, index) => ({ ...question, _order: index }));
-  currentQuestionId = questionOrder[0]?.id || null;
-  renderSources();
+  renderQuizChoices();
+  const savedPosition = loadPosition();
+  setQuiz(savedPosition.quizIndex, savedPosition.questionId, savedPosition.shuffledOrder);
   render();
   if (bank.questions.length) {
     try {
