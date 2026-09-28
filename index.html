@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101010">
+    <meta name="description" content="A focused, local-first practice quiz for AWS Solutions Architect Associate certification.">
+    <title>SAA Practice</title>
+    <script>try { document.documentElement.dataset.theme = localStorage.getItem('saa-theme') || 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Fieldnotes home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>fieldnotes<span class="brand-period">.</span></span>
+        </a>
+
+        <div class="sidebar-section">
+          <p class="eyebrow">STUDY SET</p>
+          <div class="course-name">AWS Solutions<br>Architect Associate</div>
+          <div class="course-code">SAA-C03 <span class="course-dot"></span> Practice bank</div>
+        </div>
+
+        <div class="sidebar-section bank-section">
+          <div class="section-heading">
+            <p class="eyebrow">QUESTION BANK</p>
+            <span class="count-pill" id="bank-count">0</span>
+          </div>
+          <label class="source-picker" for="source-filter">
+            <span class="source-icon" aria-hidden="true">▤</span>
+            <select id="source-filter" aria-label="Filter questions by document">
+              <option value="all">All documents</option>
+            </select>
+            <span class="select-chevron" aria-hidden="true">⌄</span>
+          </label>
+          <div class="source-list" id="source-list"></div>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="progress-label"><span>Session progress</span><span id="progress-label">0%</span></div>
+          <div class="progress-track"><span id="progress-fill"></span></div>
+          <div class="progress-detail"><span id="answered-count">0 answered</span><span id="correct-count">0 correct</span></div>
+          <div class="local-note"><span class="local-indicator"></span> Your study data stays in this browser</div>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="breadcrumb"><span>Study desk</span><span class="breadcrumb-slash">/</span><strong>Practice</strong></div>
+          <div class="theme-switch" role="group" aria-label="Color theme">
+            <button type="button" data-theme-choice="light" aria-label="Light theme" title="Light theme" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+            </button>
+            <button type="button" data-theme-choice="dark" aria-label="Dark theme" title="Dark theme" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.7 13A8.5 8.5 0 0 1 11 3.3 8.5 8.5 0 1 0 20.7 13Z"/></svg>
+            </button>
+            <button type="button" data-theme-choice="oled" aria-label="OLED pure black theme" title="OLED pure black" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle class="oled-icon-core" cx="12" cy="12" r="4.5"/></svg>
+            </button>
+          </div>
+          <div class="topbar-actions">
+            <button class="quiet-button" id="folder-button" type="button"><span aria-hidden="true">▱</span> Import folder</button>
+            <button class="primary-button import-button" id="files-button" type="button"><span aria-hidden="true">＋</span> Add DOCX</button>
+          </div>
+          <input id="folder-input" class="visually-hidden" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" webkitdirectory multiple>
+          <input id="files-input" class="visually-hidden" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+        </header>
+
+        <section class="content-wrap">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow page-kicker">CERTIFICATION PREP <span class="kicker-line"></span> SAA-C03</p>
+              <h1>Practice <span>with purpose.</span></h1>
+            </div>
+            <button class="icon-button" id="shuffle-button" type="button" aria-label="Shuffle questions" title="Shuffle questions">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+            </button>
+          </div>
+
+          <div class="quiz-meta">
+            <div class="question-position"><span class="position-mark"></span><span id="question-position">Waiting for questions</span></div>
+            <span class="meta-divider"></span>
+            <span id="question-type" class="question-type">PRACTICE</span>
+            <span class="meta-spacer"></span>
+            <span class="keyboard-hint"><kbd>1</kbd>–<kbd>5</kbd> select <span class="hint-separator">·</span> <kbd>↵</kbd> check</span>
+          </div>
+
+          <section class="question-panel" aria-live="polite">
+            <div id="empty-state" class="empty-state">
+              <div class="empty-icon" aria-hidden="true"><span></span><span></span><span></span></div>
+              <p class="eyebrow">YOUR DESK IS READY</p>
+              <h2>Bring your question bank.</h2>
+              <p class="empty-copy">Choose an answer to reveal the explanation. Your progress stays in this browser.</p>
+              <button class="primary-button empty-import" id="empty-import-button" type="button"><span aria-hidden="true">＋</span> Import DOCX files</button>
+              <p class="empty-footnote">Multiple documents supported · Duplicate questions are skipped</p>
+            </div>
+
+            <div id="quiz-content" class="quiz-content" hidden>
+              <div class="question-topline"><span id="question-number" class="question-number">QUESTION 001</span><span id="source-name" class="source-name"></span></div>
+              <h2 id="question-text" class="question-text"></h2>
+              <div class="answer-instruction"><span class="instruction-rule"></span><span id="answer-instruction-text">Choose one answer</span></div>
+              <div id="options-list" class="options-list"></div>
+              <div id="feedback" class="feedback" hidden></div>
+              <div class="question-footer">
+                <span id="selection-count" class="selection-count">Select an answer to continue</span>
+                <button class="check-button" id="check-button" type="button">Check answer <span aria-hidden="true">↗</span></button>
+              </div>
+            </div>
+          </section>
+
+          <footer class="bottom-nav">
+            <button class="nav-button" id="previous-button" type="button" aria-label="Previous question" title="Previous question" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+            <button class="nav-button" id="next-button" type="button" aria-label="Next question" title="Next question" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></button>
+            <span class="nav-caption" id="nav-caption">Import documents to begin</span>
+            <span class="nav-spacer"></span>
+            <span class="footer-course">AWS CERTIFIED SOLUTIONS ARCHITECT <span>·</span> ASSOCIATE</span>
+          </footer>
+        </section>
+      </main>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
