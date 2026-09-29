@@ -6,14 +6,133 @@ const PROGRESS_KEY = 'fieldnotes-saa-progress';
 const POSITION_KEY = 'fieldnotes-saa-position';
 const QUESTIONS_PER_QUIZ = 65;
 
+// Topic classifier: applied at bank-load to tag each question with a
+// primary topic used by the "By topic" exam mode. Patterns are ordered
+// from most specific / niche → most general so that specific services
+// win on tiebreak; ties in raw hit count fall back to that ordering.
+const TOPIC_DEFINITIONS = [
+  { key: 'migration', label: 'Migration & Data Transfer', patterns: [
+    /\bsnowball\b/, /\bsnowmobile\b/, /\bsnowcone\b/,
+    /\bdatasync\b/, /\bdms\b/, /database migration service/,
+    /\btransfer family\b/, /\baws transfer\b/, /\bsftp\b/,
+    /storage gateway/, /\bfile gateway\b/, /volume gateway/, /tape gateway/,
+    /\bmgn\b/, /application migration service/, /schema conversion tool/,
+  ] },
+  { key: 'analytics', label: 'Analytics & Streaming', patterns: [
+    /\bkinesis\b/, /firehose/, /\bmsk\b/, /managed streaming for apache kafka/,
+    /\bathena\b/, /\bredshift\b/, /\bemr\b/, /\bglue\b/, /quicksight/,
+    /\bopensearch\b/, /elasticsearch service/, /data pipeline/, /lake formation/,
+  ] },
+  { key: 'ml', label: 'Machine Learning', patterns: [
+    /sagemaker/, /\bcomprehend\b/, /\brekognition\b/, /\btextract\b/,
+    /\bpolly\b/, /\btranslate\b/, /\bforecast\b/, /\bpersonalize\b/,
+    /\bkendra\b/, /\btranscribe\b/, /\blex\b/,
+  ] },
+  { key: 'cost', label: 'Cost & Billing', patterns: [
+    /cost explorer/, /\bbudgets\b/, /savings plan/, /reserved instance/,
+    /\bri\b(?!s)/, /cost allocation/, /compute optimizer/,
+    /trusted advisor.*cost/, /cost.*trusted advisor/,
+  ] },
+  { key: 'integration', label: 'App Integration', patterns: [
+    /\bsqs\b/, /simple queue service/,
+    /\bsns\b/, /simple notification service/,
+    /\beventbridge\b/, /event bus/,
+    /step functions/, /state machine/,
+    /\bmq\b/, /\bappflow\b/, /workflow/,
+  ] },
+  { key: 'security', label: 'Security & Identity', patterns: [
+    /\biam\b/, /identity and access management/,
+    /\bkms\b/, /key management service/, /customer managed key/, /cmk\b/,
+    /secrets manager/, /\bcognito\b/,
+    /\bwaf\b/, /web application firewall/, /\bshield\b/,
+    /guardduty/, /\bmacie\b/, /\binspector\b/,
+    /\bacm\b/, /certificate manager/, /ssl certificate/,
+    /service control polic/, /\bscp\b/,
+    /aws organizations/, /\bsso\b/, /identity center/,
+    /\bcloudhsm\b/, /\bsts\b/, /security token service/,
+    /firewall manager/, /network firewall/, /detective/,
+  ] },
+  { key: 'network', label: 'Networking & Delivery', patterns: [
+    /\bvpc\b/, /\bsubnet\b/, /nat gateway/, /internet gateway/,
+    /route 53/, /\broute53\b/, /\bdns\b/,
+    /cloudfront/, /edge location/,
+    /\balb\b/, /application load balancer/,
+    /\bnlb\b/, /network load balancer/, /\bgateway load balancer\b/,
+    /\belb\b/, /elastic load balanc/,
+    /direct connect/, /site.to.site vpn/, /\bvpn\b/,
+    /transit gateway/, /\btgw\b/, /privatelink/, /interface endpoint/, /gateway endpoint/,
+    /global accelerator/, /api gateway/,
+    /\bappsync\b/, /app mesh/, /cloud map/,
+    /peering connection/, /client vpn/,
+  ] },
+  { key: 'database', label: 'Database', patterns: [
+    /\brds\b/, /relational database service/,
+    /\baurora\b/, /\bdynamodb\b/,
+    /documentdb/, /\bneptune\b/, /memorydb/, /\belasticache\b/,
+    /\bdax\b/, /dynamodb accelerator/,
+    /\bqldb\b/, /\btimestream\b/, /keyspaces/,
+    /sql server/, /\bmysql\b/, /\bpostgres/, /\boracle\b database/, /mariadb/,
+  ] },
+  { key: 'compute', label: 'Compute', patterns: [
+    /\bec2\b/, /\becs\b/, /\beks\b/, /fargate/,
+    /\blambda\b/, /\bbatch\b/, /elastic beanstalk/,
+    /auto scaling/, /autoscaling/, /spot instance/,
+    /\bami\b/, /launch template/, /launch configuration/,
+    /app runner/, /lightsail/, /outposts/, /wavelength/,
+  ] },
+  { key: 'storage', label: 'Storage', patterns: [
+    /\bs3\b/, /simple storage service/,
+    /\bebs\b/, /elastic block store/,
+    /\befs\b/, /elastic file system/,
+    /\bfsx\b/, /lustre/, /windows file server/,
+    /\bglacier\b/, /deep archive/, /intelligent.tiering/,
+    /aws backup/, /backup plan/, /recovery point/,
+    /storage lens/, /object lambda/,
+  ] },
+  { key: 'ops', label: 'Management & Ops', patterns: [
+    /cloudwatch/, /cloudtrail/, /aws config/, /configuration recorder/,
+    /systems manager/, /\bssm\b/, /session manager/, /parameter store/,
+    /trusted advisor/, /control tower/, /aws health/,
+    /aws organizations/, /service catalog/,
+    /cloudformation/, /\bcdk\b/, /\bcopilot\b/,
+    /personal health dashboard/,
+  ] },
+  { key: 'other', label: 'Other', patterns: [] },
+];
+
+function classifyTopic(question) {
+  const text = `${question.prompt} ${question.options.map((o) => o.text).join(' ')}`.toLowerCase();
+  let best = { key: 'other', hits: 0, index: TOPIC_DEFINITIONS.length };
+  TOPIC_DEFINITIONS.forEach((topic, index) => {
+    if (!topic.patterns.length) return;
+    let hits = 0;
+    for (const pattern of topic.patterns) if (pattern.test(text)) hits += 1;
+    if (hits === 0) return;
+    // Higher hit count wins; on tie, earlier (more specific) topic wins.
+    if (hits > best.hits || (hits === best.hits && index < best.index)) {
+      best = { key: topic.key, hits, index };
+    }
+  });
+  return best.key;
+}
+
+function applyTopics(list) {
+  for (const question of list) {
+    if (!question.topic) question.topic = classifyTopic(question);
+  }
+}
+
 const elements = Object.fromEntries([
-  'bank-count', 'quiz-filter', 'question-jump-form', 'question-jump', 'jump-range',
+  'bank-count', 'quiz-filter', 'quiz-filter-label', 'topic-filter', 'topic-filter-label',
+  'question-jump-form', 'question-jump', 'jump-range',
   'progress-label', 'progress-fill', 'answered-count', 'correct-count', 'accuracy-total',
   'accuracy-track', 'accuracy-correct', 'accuracy-wrong', 'accuracy-right-label', 'accuracy-wrong-label',
   'map-summary', 'wrong-filter', 'wrong-filter-count', 'question-grid', 'map-empty',
   'folder-button', 'files-button', 'folder-input', 'files-input', 'empty-import-button', 'shuffle-button',
   'question-position', 'question-type', 'empty-state', 'quiz-content', 'question-number', 'source-name',
+  'streak-row', 'streak-count', 'streak-best', 'confetti-layer',
   'question-text', 'answer-instruction-text', 'options-list', 'feedback', 'explanation', 'requirement-text',
+  'explanation-toggle', 'explanation-toggle-hint', 'explanation-body',
   'option-reasons', 'trap-text', 'takeaway-text', 'selection-count', 'check-button',
   'previous-button', 'next-button', 'nav-caption', 'toast'
 ].map((id) => [id, document.getElementById(id)]));
@@ -23,8 +142,17 @@ let progress = loadProgress();
 let questionOrder = [];
 let currentQuestionId = null;
 let currentQuizIndex = 0;
+let currentMode = 'parts'; // 'parts' (65-question chunks) or 'topics' (by topic)
+let currentTopic = TOPIC_DEFINITIONS[0].key;
 let wrongOnly = false;
 let toastTimer;
+// Session-only streak: consecutive correct answers since page load. Resets on
+// wrong or on reload — kept in-memory intentionally so a fresh session starts
+// clean and there is no "streak debt" carried across days.
+let streakCurrent = 0;
+let streakBest = 0;
+const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const CONFETTI_COLORS = ['#f6c26b', '#8fd18b', '#7fb7f2', '#e58fb7', '#c58ff2', '#f2a878'];
 
 function loadProgress() {
   try {
@@ -45,7 +173,9 @@ function saveProgress() {
 function savePosition() {
   try {
     localStorage.setItem(POSITION_KEY, JSON.stringify({
+      mode: currentMode,
       quizIndex: currentQuizIndex,
+      topic: currentTopic,
       questionId: currentQuestionId,
       shuffledOrder: questionOrder.shuffled ? questionOrder.map((question) => question.id) : null
     }));
@@ -313,15 +443,36 @@ function quizCount() {
   return Math.ceil(bank.questions.length / QUESTIONS_PER_QUIZ);
 }
 
-function quizQuestions(index = currentQuizIndex) {
+function partsQuestions(index) {
   const start = index * QUESTIONS_PER_QUIZ;
   return bank.questions.slice(start, start + QUESTIONS_PER_QUIZ)
     .map((question, offset) => ({ ...question, _order: start + offset }));
 }
 
-function setQuiz(index, questionId = null, shuffledOrder = null) {
-  const count = quizCount();
-  currentQuizIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(count - 1, 0)));
+function topicQuestions(topicKey) {
+  const filtered = [];
+  bank.questions.forEach((question, offset) => {
+    if (question.topic === topicKey) filtered.push({ ...question, _order: offset });
+  });
+  return filtered;
+}
+
+function quizQuestions(indexOrKey = null) {
+  if (currentMode === 'topics') {
+    return topicQuestions(indexOrKey === null ? currentTopic : indexOrKey);
+  }
+  return partsQuestions(indexOrKey === null ? currentQuizIndex : Number(indexOrKey));
+}
+
+function setQuiz(indexOrKey = null, questionId = null, shuffledOrder = null) {
+  if (currentMode === 'topics') {
+    const knownKeys = new Set(TOPIC_DEFINITIONS.map((topic) => topic.key));
+    const requested = indexOrKey === null || indexOrKey === undefined ? currentTopic : String(indexOrKey);
+    currentTopic = knownKeys.has(requested) ? requested : TOPIC_DEFINITIONS[0].key;
+  } else {
+    const count = quizCount();
+    currentQuizIndex = Math.max(0, Math.min(Number(indexOrKey) || 0, Math.max(count - 1, 0)));
+  }
   const canonical = quizQuestions();
   const byId = new Map(canonical.map((question) => [question.id, question]));
   const canRestoreShuffle = Array.isArray(shuffledOrder)
@@ -332,32 +483,72 @@ function setQuiz(index, questionId = null, shuffledOrder = null) {
   currentQuestionId = questionOrder.some((question) => question.id === questionId)
     ? questionId
     : questionOrder[0]?.id || null;
-  elements['quiz-filter'].value = String(currentQuizIndex);
+  if (currentMode === 'topics') {
+    elements['topic-filter'].value = currentTopic;
+  } else {
+    elements['quiz-filter'].value = String(currentQuizIndex);
+  }
   elements['question-jump'].max = String(Math.max(questionOrder.length, 1));
   elements['jump-range'].textContent = `of ${questionOrder.length}`;
   savePosition();
 }
 
 function renderQuizChoices() {
-  const options = Array.from({ length: quizCount() }, (_, index) => {
+  const partOptions = Array.from({ length: quizCount() }, (_, index) => {
     const first = index * QUESTIONS_PER_QUIZ + 1;
     const last = Math.min(first + QUESTIONS_PER_QUIZ - 1, bank.questions.length);
     return new Option(`Quiz ${String(index + 1).padStart(2, '0')} · ${first}–${last}`, String(index));
   });
-  elements['quiz-filter'].replaceChildren(...options);
-  elements['quiz-filter'].value = String(currentQuizIndex);
+  elements['quiz-filter'].replaceChildren(...partOptions);
+  if (currentMode === 'parts') elements['quiz-filter'].value = String(currentQuizIndex);
+
+  const topicOptions = TOPIC_DEFINITIONS
+    .map((topic) => ({ topic, count: bank.questions.filter((question) => question.topic === topic.key).length }))
+    .filter(({ count }) => count > 0)
+    .map(({ topic, count }) => new Option(`${topic.label} · ${count}`, topic.key));
+  elements['topic-filter'].replaceChildren(...topicOptions);
+  if (currentMode === 'topics') {
+    const available = new Set(topicOptions.map((opt) => opt.value));
+    if (!available.has(currentTopic) && topicOptions.length) currentTopic = topicOptions[0].value;
+    elements['topic-filter'].value = currentTopic;
+  }
 }
 
 function updateQuizCompletion() {
-  for (const option of elements['quiz-filter'].options) {
-    const index = Number(option.value);
-    const questions = quizQuestions(index);
-    const complete = questions.length > 0 && questions.every((question) => progress[question.id]?.checked);
-    const first = index * QUESTIONS_PER_QUIZ + 1;
-    const last = Math.min(first + QUESTIONS_PER_QUIZ - 1, bank.questions.length);
-    option.textContent = `Quiz ${String(index + 1).padStart(2, '0')} · ${first}–${last}${complete ? ' · ✓ DONE' : ''}`;
-    option.dataset.complete = String(complete);
+  if (currentMode === 'parts') {
+    for (const option of elements['quiz-filter'].options) {
+      const index = Number(option.value);
+      const questions = partsQuestions(index);
+      const complete = questions.length > 0 && questions.every((question) => progress[question.id]?.checked);
+      const first = index * QUESTIONS_PER_QUIZ + 1;
+      const last = Math.min(first + QUESTIONS_PER_QUIZ - 1, bank.questions.length);
+      option.textContent = `Quiz ${String(index + 1).padStart(2, '0')} · ${first}–${last}${complete ? ' · ✓ DONE' : ''}`;
+      option.dataset.complete = String(complete);
+    }
+  } else {
+    for (const option of elements['topic-filter'].options) {
+      const key = option.value;
+      const topic = TOPIC_DEFINITIONS.find((entry) => entry.key === key);
+      if (!topic) continue;
+      const questions = topicQuestions(key);
+      const complete = questions.length > 0 && questions.every((question) => progress[question.id]?.checked);
+      option.textContent = `${topic.label} · ${questions.length}${complete ? ' · ✓ DONE' : ''}`;
+      option.dataset.complete = String(complete);
+    }
   }
+}
+
+function setMode(mode) {
+  const validMode = mode === 'topics' ? 'topics' : 'parts';
+  currentMode = validMode;
+  document.querySelectorAll('[data-mode-choice]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.modeChoice === validMode));
+  });
+  elements['quiz-filter-label'].hidden = validMode !== 'parts';
+  elements['topic-filter-label'].hidden = validMode !== 'topics';
+  renderQuizChoices();
+  setQuiz(validMode === 'topics' ? currentTopic : currentQuizIndex);
+  render();
 }
 
 function selectedQuestion() {
@@ -492,10 +683,25 @@ function makeOptionRationale(option, correctOption, requirement) {
   return `${optionDescription} This is less suitable for this scenario because the deciding requirement is: ${requirement} ${comparison}`;
 }
 
+function setExplanationExpanded(expanded) {
+  const section = elements['explanation'];
+  section.dataset.expanded = String(expanded);
+  elements['explanation-toggle'].setAttribute('aria-expanded', String(expanded));
+  elements['explanation-toggle-hint'].textContent = expanded ? 'Hide' : 'Show';
+}
+
 function renderExplanation(question, state, correctOptions) {
   elements['explanation'].hidden = !state.checked;
   elements['option-reasons'].replaceChildren();
-  if (!state.checked) return;
+  if (!state.checked) {
+    setExplanationExpanded(false);
+    return;
+  }
+  // Default to collapsed each time the question changes; user opens it on demand.
+  if (elements['explanation'].dataset.forQuestion !== question.id) {
+    elements['explanation'].dataset.forQuestion = question.id;
+    setExplanationExpanded(false);
+  }
 
   const requirement = extractRequirement(question.prompt) || 'Choose the option that meets all stated constraints.';
   const primaryCorrect = correctOptions[0];
@@ -537,7 +743,12 @@ function render() {
   elements['previous-button'].disabled = !question || questionIndex === 0;
   elements['next-button'].disabled = !question || questionIndex === list.length - 1;
   elements['question-position'].textContent = question ? `Question ${questionIndex + 1} of ${list.length}` : 'Waiting for questions';
-  elements['question-type'].textContent = `QUIZ ${String(currentQuizIndex + 1).padStart(2, '0')} · PRACTICE`;
+  if (currentMode === 'topics') {
+    const topic = TOPIC_DEFINITIONS.find((entry) => entry.key === currentTopic);
+    elements['question-type'].textContent = `${(topic?.label || 'TOPIC').toUpperCase()} · PRACTICE`;
+  } else {
+    elements['question-type'].textContent = `QUIZ ${String(currentQuizIndex + 1).padStart(2, '0')} · PRACTICE`;
+  }
   elements['question-jump'].value = question ? String(questionIndex + 1) : '';
   elements['question-jump'].max = String(Math.max(list.length, 1));
   elements['jump-range'].textContent = `of ${list.length}`;
@@ -581,7 +792,11 @@ function render() {
     button.classList.toggle('selected', state.selected.includes(option.letter));
     if (state.checked && option.correct) button.classList.add('is-correct');
     if (state.checked && state.selected.includes(option.letter) && !option.correct) button.classList.add('is-wrong');
-    button.disabled = state.checked;
+    // Use aria-disabled instead of the disabled attribute so option text
+    // stays selectable/copyable after grading. Clicks are already guarded
+    // in toggleOption() by state.checked.
+    button.classList.toggle('is-locked', state.checked);
+    button.setAttribute('aria-disabled', String(state.checked));
     button.setAttribute('aria-pressed', String(state.selected.includes(option.letter)));
     const letter = document.createElement('span');
     letter.className = 'option-letter';
@@ -610,6 +825,77 @@ function toggleOption(question, option) {
   render();
 }
 
+function renderStreak(bumped, milestone) {
+  const active = streakCurrent > 0;
+  elements['streak-row'].dataset.active = String(active);
+  elements['streak-count'].textContent = String(streakCurrent);
+  elements['streak-best'].textContent = `Best ${streakBest}`;
+  if (bumped && !REDUCED_MOTION) {
+    const badge = elements['streak-count'];
+    badge.classList.remove('bump');
+    void badge.offsetWidth; // restart animation
+    badge.classList.add('bump');
+  }
+  if (milestone && !REDUCED_MOTION) {
+    const row = elements['streak-row'];
+    row.classList.remove('milestone');
+    void row.offsetWidth;
+    row.classList.add('milestone');
+  }
+}
+
+function launchConfetti(intensity) {
+  if (REDUCED_MOTION) return;
+  const layer = elements['confetti-layer'];
+  const button = elements['check-button'];
+  const rect = button.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+  const count = Math.round((intensity || 1) * 22);
+  for (let i = 0; i < count; i += 1) {
+    const piece = document.createElement('span');
+    piece.className = 'confetti-piece';
+    const angle = (-Math.PI / 2) + (Math.random() - 0.5) * (Math.PI * 0.9);
+    const distance = 120 + Math.random() * 220 * (intensity || 1);
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance + 40 + Math.random() * 220;
+    const dur = 900 + Math.random() * 700;
+    piece.style.left = `${originX}px`;
+    piece.style.top = `${originY}px`;
+    piece.style.width = `${5 + Math.random() * 6}px`;
+    piece.style.height = `${8 + Math.random() * 8}px`;
+    piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    piece.style.setProperty('--dx', `${dx}px`);
+    piece.style.setProperty('--dy', `${dy}px`);
+    piece.style.setProperty('--dr', `${Math.floor(Math.random() * 720 - 360)}deg`);
+    piece.style.setProperty('--dur', `${dur}ms`);
+    layer.appendChild(piece);
+    setTimeout(() => piece.remove(), dur + 60);
+  }
+}
+
+function playReward(correct) {
+  // Toggle the reward class on option buttons and let CSS animate them. The
+  // class name is class-scoped so it is safe to reset every render pass.
+  requestAnimationFrame(() => {
+    const options = elements['options-list'].querySelectorAll('.answer-option');
+    for (const button of options) {
+      button.classList.remove('play-reward', 'play-reveal');
+      void button.offsetWidth;
+      if (button.classList.contains('is-wrong')) button.classList.add('play-reward');
+      if (button.classList.contains('is-correct')) {
+        button.classList.add(correct ? 'play-reward' : 'play-reveal');
+      }
+    }
+  });
+  if (correct) {
+    elements['check-button'].classList.remove('flash-correct');
+    void elements['check-button'].offsetWidth;
+    elements['check-button'].classList.add('flash-correct');
+    launchConfetti(1);
+  }
+}
+
 function checkAnswer() {
   const question = selectedQuestion();
   if (!question) return;
@@ -625,7 +911,22 @@ function checkAnswer() {
   state.correct = expected.length === actual.length && expected.every((letter, index) => letter === actual[index]);
   progress[question.id] = state;
   saveProgress();
+  // Update session streak: increment on correct, reset on wrong. Fire a bigger
+  // celebration at every 5-answer milestone (5, 10, 15, …).
+  let bumped = false;
+  let milestone = false;
+  if (state.correct) {
+    streakCurrent += 1;
+    bumped = true;
+    if (streakCurrent > streakBest) streakBest = streakCurrent;
+    if (streakCurrent >= 5 && streakCurrent % 5 === 0) milestone = true;
+  } else {
+    streakCurrent = 0;
+  }
+  renderStreak(bumped, milestone);
   render();
+  playReward(state.correct);
+  if (milestone) launchConfetti(2.2);
 }
 
 function moveQuestion(direction) {
@@ -733,8 +1034,9 @@ async function importFiles(fileList) {
   for (const source of bank.sources) {
     source.count = bank.questions.filter((question) => question.source === source.name).length;
   }
+  applyTopics(bank.questions);
   renderQuizChoices();
-  setQuiz(currentQuizIndex, currentQuestionId);
+  setQuiz(currentMode === 'topics' ? currentTopic : currentQuizIndex, currentQuestionId);
   render();
 
   try {
@@ -766,6 +1068,17 @@ elements['quiz-filter'].addEventListener('change', () => {
   setQuiz(Number(elements['quiz-filter'].value));
   render();
 });
+elements['topic-filter'].addEventListener('change', () => {
+  wrongOnly = false;
+  setQuiz(elements['topic-filter'].value);
+  render();
+});
+document.querySelectorAll('[data-mode-choice]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (button.getAttribute('aria-pressed') === 'true') return;
+    setMode(button.dataset.modeChoice);
+  });
+});
 elements['wrong-filter'].addEventListener('click', () => {
   wrongOnly = !wrongOnly;
   renderQuestionMap();
@@ -785,6 +1098,10 @@ elements['shuffle-button'].addEventListener('click', shuffleQuestions);
 elements['previous-button'].addEventListener('click', () => moveQuestion(-1));
 elements['next-button'].addEventListener('click', () => moveQuestion(1));
 elements['check-button'].addEventListener('click', checkAnswer);
+elements['explanation-toggle'].addEventListener('click', () => {
+  const expanded = elements['explanation'].dataset.expanded !== 'true';
+  setExplanationExpanded(expanded);
+});
 document.addEventListener('keydown', (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.target.matches('input, select, textarea')) return;
   if (event.key === 'Enter') {
@@ -816,9 +1133,22 @@ document.addEventListener('keydown', (event) => {
     showToast('Browser storage is unavailable. Your bundled questions are still available.');
   }
   bank = mergeBanks(bundledBank, savedBank);
-  renderQuizChoices();
+  applyTopics(bank.questions);
   const savedPosition = loadPosition();
-  setQuiz(savedPosition.quizIndex, savedPosition.questionId, savedPosition.shuffledOrder);
+  const savedMode = savedPosition.mode === 'topics' ? 'topics' : 'parts';
+  currentMode = savedMode;
+  if (savedPosition.topic && TOPIC_DEFINITIONS.some((topic) => topic.key === savedPosition.topic)) {
+    currentTopic = savedPosition.topic;
+  }
+  document.querySelectorAll('[data-mode-choice]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.modeChoice === savedMode));
+  });
+  elements['quiz-filter-label'].hidden = savedMode !== 'parts';
+  elements['topic-filter-label'].hidden = savedMode !== 'topics';
+  renderQuizChoices();
+  const resumeKey = savedMode === 'topics' ? currentTopic : (savedPosition.quizIndex ?? 0);
+  setQuiz(resumeKey, savedPosition.questionId, savedPosition.shuffledOrder);
+  renderStreak(false, false);
   render();
   if (bank.questions.length) {
     try {

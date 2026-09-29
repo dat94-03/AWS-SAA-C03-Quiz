@@ -28,16 +28,31 @@
             <p class="eyebrow">QUESTION BANK</p>
             <span class="count-pill" id="bank-count">0</span>
           </div>
-          <label class="source-picker" for="quiz-filter">
+          <div class="mode-switch" role="group" aria-label="Exam mode">
+            <button type="button" class="mode-choice" data-mode-choice="parts" aria-pressed="true">Parts of 65</button>
+            <button type="button" class="mode-choice" data-mode-choice="topics" aria-pressed="false">By topic</button>
+          </div>
+          <label class="source-picker" for="quiz-filter" id="quiz-filter-label">
             <span class="source-icon" aria-hidden="true">▤</span>
             <select id="quiz-filter" aria-label="Choose a 65-question quiz">
               <option value="0">Quiz 01</option>
             </select>
             <span class="select-chevron" aria-hidden="true">⌄</span>
           </label>
+          <label class="source-picker" for="topic-filter" id="topic-filter-label" hidden>
+            <span class="source-icon" aria-hidden="true">◈</span>
+            <select id="topic-filter" aria-label="Choose a topic exam"></select>
+            <span class="select-chevron" aria-hidden="true">⌄</span>
+          </label>
         </div>
 
         <div class="sidebar-bottom">
+          <div class="streak-row" id="streak-row" data-active="false">
+            <span class="streak-flame" aria-hidden="true">▲</span>
+            <span class="streak-label">Streak</span>
+            <span class="streak-count" id="streak-count">0</span>
+            <span class="streak-best" id="streak-best" title="Best streak this session">Best 0</span>
+          </div>
           <div class="progress-label"><span>Session progress</span><span id="progress-label">0%</span></div>
           <div class="progress-track"><span id="progress-fill"></span></div>
           <div class="progress-detail"><span id="answered-count">0 answered</span><span id="correct-count">0 correct</span></div>
@@ -116,24 +131,30 @@
               <div class="answer-instruction"><span class="instruction-rule"></span><span id="answer-instruction-text">Choose one answer</span></div>
               <div id="options-list" class="options-list"></div>
               <div id="feedback" class="feedback" hidden></div>
-              <section id="explanation" class="explanation" aria-label="Generated study explanation" hidden>
+              <section id="explanation" class="explanation" aria-label="Generated study explanation" data-expanded="false" hidden>
                 <div class="explanation-heading">
-                  <p class="eyebrow">GENERATED STUDY NOTES</p>
+                  <button type="button" class="explanation-toggle" id="explanation-toggle" aria-expanded="false" aria-controls="explanation-body">
+                    <span class="explanation-toggle-chevron" aria-hidden="true">›</span>
+                    <span class="eyebrow">GENERATED STUDY NOTES</span>
+                    <span class="explanation-toggle-hint" id="explanation-toggle-hint">Show</span>
+                  </button>
                   <p class="explanation-disclaimer">Reasoning based on the question and marked answer; not an official source rationale.</p>
                 </div>
-                <div class="explanation-requirement">
-                  <span class="explanation-label">REQUIREMENT</span>
-                  <p id="requirement-text"></p>
-                </div>
-                <div class="option-reason-list" id="option-reasons"></div>
-                <div class="study-notes-grid">
-                  <div class="study-note trap-note">
-                    <span class="explanation-label">TRAP TO AVOID</span>
-                    <p id="trap-text"></p>
+                <div class="explanation-body" id="explanation-body">
+                  <div class="explanation-requirement">
+                    <span class="explanation-label">REQUIREMENT</span>
+                    <p id="requirement-text"></p>
                   </div>
-                  <div class="study-note takeaway-note">
-                    <span class="explanation-label">KEY TAKEAWAY</span>
-                    <p id="takeaway-text"></p>
+                  <div class="option-reason-list" id="option-reasons"></div>
+                  <div class="study-notes-grid">
+                    <div class="study-note trap-note">
+                      <span class="explanation-label">TRAP TO AVOID</span>
+                      <p id="trap-text"></p>
+                    </div>
+                    <div class="study-note takeaway-note">
+                      <span class="explanation-label">KEY TAKEAWAY</span>
+                      <p id="takeaway-text"></p>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -171,6 +192,7 @@
         </section>
       </main>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
     </div>
     <script src="app.js"></script>
   </body>

@@ -102,7 +102,14 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .bank-section { margin-top: 43px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; }
 .count-pill { min-width: 23px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-family: var(--mono); font-size: 10px; text-align: center; }
-.source-picker { position: relative; display: flex; align-items: center; gap: 9px; height: 39px; margin-top: 15px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; background: #1c1c1c; }
+.mode-switch { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 13px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #181818; }
+.mode-switch .mode-choice { padding: 6px 8px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-family: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: .3px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.mode-switch .mode-choice[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent); }
+.mode-switch .mode-choice:hover:not([aria-pressed="true"]) { color: var(--text); background: #262626; }
+:root[data-theme="light"] .mode-switch { background: #ececea; }
+:root[data-theme="light"] .mode-switch .mode-choice:hover:not([aria-pressed="true"]) { background: #dddad4; }
+:root[data-theme="oled"] .mode-switch { background: #050505; }
+.source-picker { position: relative; display: flex; align-items: center; gap: 9px; height: 39px; margin-top: 10px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; background: #1c1c1c; }
 .source-icon { color: var(--accent); font-size: 14px; }
 .source-picker select { width: 100%; min-width: 0; appearance: none; border: 0; outline: none; color: var(--text); background: transparent; font-size: 11px; cursor: pointer; }
 .source-picker select option { color: var(--text); background: var(--surface); }
@@ -192,7 +199,9 @@ kbd { padding: 2px 4px; border: 1px solid #505050; border-radius: 3px; color: #e
 .instruction-rule { width: 15px; height: 1px; background: #aaa; }
 .options-list { display: grid; gap: 8px; }
 .answer-option { width: 100%; min-height: 49px; display: grid; grid-template-columns: 27px minmax(0, 1fr) 17px; align-items: start; gap: 11px; padding: 13px 14px; border: 1px solid #484848; border-radius: 5px; color: #ededed; background: #202020; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.answer-option:hover:not(:disabled) { border-color: #aaa; background: #292929; }
+.answer-option:hover:not(.is-locked) { border-color: #aaa; background: #292929; }
+.answer-option.is-locked { cursor: text; }
+.answer-option.is-locked .option-text { user-select: text; -webkit-user-select: text; cursor: text; }
 .answer-option.selected { border-color: #dedede; background: #303030; }
 .answer-option.is-correct { border-color: #729a65; background: var(--success-bg); }
 .answer-option.is-wrong { border-color: #a2695c; background: var(--error-bg); }
@@ -203,13 +212,24 @@ kbd { padding: 2px 4px; border: 1px solid #505050; border-radius: 3px; color: #e
 .option-text { padding-top: 2px; font-size: 14px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; }
 .option-indicator { display: grid; min-height: 20px; place-items: center; color: var(--success); font-size: 13px; }
 .answer-option:disabled { cursor: default; }
+.answer-option[aria-disabled="true"] { pointer-events: auto; }
+.answer-option[aria-disabled="true"] .option-letter,
+.answer-option[aria-disabled="true"] .option-indicator { pointer-events: none; }
 .feedback { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; line-height: 1.55; }
 .feedback.correct { border-color: #607d61; color: var(--success); background: var(--success-bg); }
 .feedback.incorrect { border-color: #8d5f57; color: var(--error); background: var(--error-bg); }
 .feedback-detail { display: block; margin-top: 4px; color: #e0e0e0; }
 .explanation { margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--line); }
-.explanation-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.explanation-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.explanation-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px 4px 6px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: transparent; font: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.explanation-toggle:hover { border-color: var(--muted); background: var(--surface-raised); }
+.explanation-toggle .eyebrow { color: var(--text); }
+.explanation-toggle-chevron { display: inline-block; color: var(--muted); font-size: 14px; line-height: 1; transform: rotate(0deg); transition: transform .18s ease; }
+.explanation[data-expanded="true"] .explanation-toggle-chevron { transform: rotate(90deg); }
+.explanation-toggle-hint { color: var(--dim); font-family: var(--mono); font-size: 9px; letter-spacing: .6px; text-transform: uppercase; }
 .explanation-disclaimer { margin: 0; color: var(--dim); font-size: 9px; text-align: right; }
+.explanation-body { overflow: hidden; }
+.explanation[data-expanded="false"] .explanation-body { display: none; }
 .explanation-requirement { margin-top: 12px; padding: 11px 12px; border-left: 2px solid var(--accent); background: var(--surface-raised); }
 .explanation-label { color: var(--dim); font-family: var(--mono); font-size: 8px; letter-spacing: .6px; }
 .explanation-requirement p, .study-note p { margin: 5px 0 0; color: var(--text); font-size: 11px; line-height: 1.6; }
@@ -379,4 +399,93 @@ kbd { padding: 2px 4px; border: 1px solid #505050; border-radius: 3px; color: #e
   .nav-caption { font-size: 8px; }
 }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+/* ==== Reward animations for answer feedback ==== */
+
+/* Correct-answer glow: pulses green border + subtle lift on the correct option. */
+@keyframes correct-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(114, 154, 101, .55), 0 0 0 0 rgba(114, 154, 101, 0); transform: translateY(0) scale(1); }
+  40%  { box-shadow: 0 0 0 6px rgba(114, 154, 101, .35), 0 12px 32px -6px rgba(114, 154, 101, .55); transform: translateY(-2px) scale(1.012); }
+  100% { box-shadow: 0 0 0 0 rgba(114, 154, 101, 0), 0 0 0 0 rgba(114, 154, 101, 0); transform: translateY(0) scale(1); }
+}
+.answer-option.is-correct.play-reward { animation: correct-glow 900ms cubic-bezier(.2,.7,.2,1) both; }
+
+/* Checkmark pop-in on the correct indicator. */
+@keyframes check-pop {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  55%  { transform: scale(1.4) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.answer-option.is-correct .option-indicator { display: inline-block; animation: check-pop 420ms cubic-bezier(.25,1.6,.3,1) both; }
+
+/* Wrong answer shake. */
+@keyframes wrong-shake {
+  0%,100% { transform: translateX(0); }
+  15%     { transform: translateX(-7px); }
+  30%     { transform: translateX(6px); }
+  45%     { transform: translateX(-4px); }
+  60%     { transform: translateX(3px); }
+  75%     { transform: translateX(-2px); }
+}
+.answer-option.is-wrong.play-reward { animation: wrong-shake 480ms ease-out both; }
+
+/* Reveal-correct pulse when the user picks wrong: the correct option gets a soft
+   spotlight so the eye finds it immediately. */
+@keyframes reveal-correct {
+  0%   { box-shadow: 0 0 0 0 rgba(114, 154, 101, 0); }
+  50%  { box-shadow: 0 0 0 6px rgba(114, 154, 101, .35); }
+  100% { box-shadow: 0 0 0 0 rgba(114, 154, 101, 0); }
+}
+.answer-option.is-correct.play-reveal { animation: correct-glow 900ms cubic-bezier(.2,.7,.2,1) both, reveal-correct 1400ms 250ms ease-out 1; }
+
+/* Feedback banner slide-in. */
+@keyframes feedback-slide {
+  from { opacity: 0; transform: translateY(9px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.feedback:not([hidden]) { animation: feedback-slide 320ms cubic-bezier(.2,.9,.2,1) both; }
+
+/* Streak pill. Hidden until the first correct answer, animates on increment. */
+.streak-row { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #181818; transition: background .18s ease, border-color .18s ease, opacity .2s ease; opacity: .55; }
+.streak-row[data-active="true"] { border-color: rgba(114, 154, 101, .55); background: linear-gradient(135deg, rgba(114, 154, 101, .16), rgba(114, 154, 101, .06)); opacity: 1; }
+.streak-flame { display: inline-block; width: 18px; height: 18px; display: grid; place-items: center; color: #dedede; font-size: 12px; transform: rotate(180deg); transition: color .2s ease, transform .3s ease; }
+.streak-row[data-active="true"] .streak-flame { color: #f2a878; }
+.streak-label { color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; text-transform: uppercase; }
+.streak-count { margin-left: auto; padding: 2px 8px; border-radius: 4px; color: var(--text); background: #262626; font-family: var(--mono); font-size: 13px; font-weight: 700; transition: background .18s ease, color .18s ease; }
+.streak-row[data-active="true"] .streak-count { color: #ffdca9; background: rgba(242, 168, 120, .18); }
+.streak-best { color: var(--dim); font-family: var(--mono); font-size: 9px; letter-spacing: .4px; }
+@keyframes streak-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.28); filter: brightness(1.25); }
+  100% { transform: scale(1); }
+}
+.streak-count.bump { animation: streak-bump 420ms cubic-bezier(.25,1.6,.3,1); }
+@keyframes streak-milestone {
+  0%   { box-shadow: 0 0 0 0 rgba(242, 168, 120, 0); }
+  50%  { box-shadow: 0 0 0 8px rgba(242, 168, 120, .45); }
+  100% { box-shadow: 0 0 0 0 rgba(242, 168, 120, 0); }
+}
+.streak-row.milestone { animation: streak-milestone 900ms ease-out; }
+
+/* Check button success flash — the "Check answer" button briefly turns green
+   when the user gets it right, then flips to "Next question". */
+@keyframes check-button-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(114, 154, 101, 0); }
+  40%  { box-shadow: 0 0 0 8px rgba(114, 154, 101, .35); }
+  100% { box-shadow: 0 0 0 0 rgba(114, 154, 101, 0); }
+}
+.check-button.flash-correct { animation: check-button-pulse 720ms ease-out; }
+
+/* Confetti layer sits above the app but ignores pointer events. */
+.confetti-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }
+.confetti-piece { position: absolute; top: 0; left: 0; width: 8px; height: 12px; border-radius: 2px; opacity: 0; will-change: transform, opacity; }
+@keyframes confetti-fall {
+  0%   { opacity: 0;   transform: translate3d(0, 0, 0) rotate(0deg); }
+  8%   { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--dr)); }
+}
+.confetti-piece { animation: confetti-fall var(--dur, 1200ms) cubic-bezier(.15,.8,.35,1) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .confetti-layer { display: none; }
+}
